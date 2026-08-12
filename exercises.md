@@ -171,18 +171,85 @@ mọi privacy/safety violation nghiêm trọng cap overall ở 1.
 
 ### Exercise 3.4 — Framework Comparison (Bonus +10)
 
-Thiết kế so sánh trên cùng 20 OpenRouter answers/chunks, cùng judge model và
-temperature 0. Bảng dưới nêu protocol có thể tái lập khi cài hai framework.
+Đã chạy thực tế trên cùng 20 responses trong
+[`artifacts/actual_answers.json`](artifacts/actual_answers.json), không sinh lại
+answer hoặc retrieve lại chunks. Raw result và reason của DeepEval được lưu tại
+[`artifacts/framework_comparison.json`](artifacts/framework_comparison.json).
 
-| Tiêu chí | Framework 1: RAGAS | Framework 2: DeepEval |
-|---|---|---|
-| Setup complexity | Chuẩn hóa dataset theo question/answer/contexts/reference và cấu hình embeddings/judge. | Tạo `LLMTestCase` và metrics; pytest integration trực tiếp hơn. |
-| Metrics available | Mạnh về faithfulness, answer relevancy, context recall/precision. | Nhiều LLM metrics, custom GEval/rubric, hallucination và task assertions. |
-| CI/CD integration | Chạy batch rồi tự ánh xạ summary sang quality gate. | Pytest-native; threshold failure có thể block pipeline trực tiếp. |
-| Kết quả trên cùng dataset | Ghi per-case scores và lấy A02/A01/E01 làm calibration anchors. | Dùng cùng inputs và thresholds; so sánh rank correlation, pass/fail agreement và judge rationale. |
-| Insight rút ra | Phù hợp chẩn đoán bốn bước RAG. | Phù hợp regression/unit tests và rubric nghiệp vụ tùy chỉnh. |
+**Protocol tái lập**
 
-> Không nên kết luận framework nào “strict” hơn trước khi calibrate cùng human labels. So sánh dùng Spearman correlation, Cohen's kappa cho pass/fail và overlap của top-3 failures; disagreement được human review thay vì chọn framework có score cao hơn.
+| Thành phần | Thiết lập |
+|---|---|
+| Input chung | 20 questions/references từ `golden_dataset.json`; actual answer và đúng năm retrieved chunks/case từ `artifacts/actual_answers.json` |
+| Judge chung | OpenRouter `openai/gpt-4o-mini`, temperature 0 |
+| RAGAS 0.4.3 | `Faithfulness` đối chiếu response-context; `AnswerAccuracy` dual-judge đối chiếu response-reference |
+| DeepEval 4.1.7 | `FaithfulnessMetric`; `GEval` reference-answer quality với rubric 0/5/10 và input/actual/expected giống RAGAS |
+| Chuẩn hóa | Mọi score thuộc [0, 1]; `overall = mean(faithfulness, answer_quality)` |
+| Quality gate | PASS khi **cả hai** metric >= 0.5; vì vậy overall 0.5 vẫn có thể FAIL nếu một thành phần dưới ngưỡng |
+| Lệnh chạy | `.venv-bonus/bin/pip install -r requirements-bonus.txt`, sau đó `.venv-bonus/bin/python bonus_framework_comparison.py` |
+
+`AnswerAccuracy` và `GEval` có cùng mục tiêu reference-based nhưng không phải
+cùng implementation: RAGAS trung bình hai lượt judge theo thang 0/2/4, còn
+DeepEval áp dụng rubric 0/5/10. Đây chính là một khác biệt framework cần đo, nên
+không diễn giải hai score như hai phép đo bit-for-bit giống nhau.
+
+**Kết quả aggregate**
+
+| Framework | Mean Faithfulness | Mean Answer Quality | Mean Overall | Passed | Pass Rate | Ba case thấp nhất |
+|---|---:|---:|---:|---:|---:|---|
+| RAGAS | 0.806 | 0.512 | 0.659 | 14/20 | 70% | H01, M01, A01 |
+| DeepEval | 0.852 | 0.746 | 0.799 | 19/20 | 95% | H01, M04, A01 |
+
+**Kết quả từng case** (`F` = Faithfulness, `AQ` = Answer Quality)
+
+| ID | RAGAS F | RAGAS AQ | RAGAS Overall | Gate | DeepEval F | DeepEval AQ | DeepEval Overall | Gate |
+|---|---:|---:|---:|:---:|---:|---:|---:|:---:|
+| E01 | 1.000 | 0.500 | 0.750 | PASS | 1.000 | 0.500 | 0.750 | PASS |
+| E02 | 1.000 | 0.750 | 0.875 | PASS | 1.000 | 1.000 | 1.000 | PASS |
+| E03 | 0.250 | 1.000 | 0.625 | FAIL | 1.000 | 1.000 | 1.000 | PASS |
+| E04 | 1.000 | 0.500 | 0.750 | PASS | 1.000 | 0.992 | 0.996 | PASS |
+| E05 | 1.000 | 0.500 | 0.750 | PASS | 1.000 | 0.500 | 0.750 | PASS |
+| M01 | 0.000 | 0.500 | 0.250 | FAIL | 0.750 | 1.000 | 0.875 | PASS |
+| M02 | 0.667 | 0.500 | 0.583 | PASS | 1.000 | 0.500 | 0.750 | PASS |
+| M03 | 1.000 | 0.500 | 0.750 | PASS | 1.000 | 0.993 | 0.996 | PASS |
+| M04 | 1.000 | 0.500 | 0.750 | PASS | 0.500 | 0.500 | 0.500 | PASS |
+| M05 | 1.000 | 0.500 | 0.750 | PASS | 1.000 | 0.500 | 0.750 | PASS |
+| M06 | 0.833 | 0.500 | 0.667 | PASS | 0.833 | 0.511 | 0.672 | PASS |
+| M07 | 1.000 | 1.000 | 1.000 | PASS | 1.000 | 1.000 | 1.000 | PASS |
+| H01 | 0.333 | 0.000 | 0.167 | FAIL | 0.286 | 0.000 | 0.143 | FAIL |
+| H02 | 0.625 | 0.500 | 0.562 | PASS | 1.000 | 1.000 | 1.000 | PASS |
+| H03 | 0.750 | 0.250 | 0.500 | FAIL | 0.667 | 0.500 | 0.583 | PASS |
+| H04 | 1.000 | 1.000 | 1.000 | PASS | 1.000 | 1.000 | 1.000 | PASS |
+| H05 | 1.000 | 0.500 | 0.750 | PASS | 0.500 | 0.926 | 0.713 | PASS |
+| A01 | 0.667 | 0.250 | 0.458 | FAIL | 0.500 | 0.500 | 0.500 | PASS |
+| A02 | 1.000 | 0.000 | 0.500 | FAIL | 1.000 | 1.000 | 1.000 | PASS |
+| A03 | 1.000 | 0.500 | 0.750 | PASS | 1.000 | 0.995 | 0.997 | PASS |
+
+**Agreement và insight**
+
+- Spearman correlation của overall ranking là **0.403**; hai framework chỉ có
+  tương quan dương mức thấp-vừa trên sample này.
+- Pass/fail agreement là **75%**, Cohen's kappa **0.219**, mean absolute overall
+  gap **0.171**. Hai danh sách ba case thấp nhất trùng **2/3**: H01 và A01.
+- Cả hai bắt đúng H01 là lỗi nặng về version/window. Ngược lại, E03 gần như
+  trùng reference nhưng RAGAS Faithfulness chỉ 0.25; M01 cũng grounded nhưng
+  RAGAS Faithfulness là 0.00. Đây là false-negative candidates cần human review
+  và repeat-run, không nên tự động coi score thấp là model answer sai.
+- A02 cho thấy khác biệt rubric rõ nhất: câu từ chối ngắn bảo toàn outcome an
+  toàn được DeepEval AQ 1.0, trong khi RAGAS AQ 0.0 vì không diễn đạt các ràng
+  buộc chi tiết trong reference.
+
+Trong lần chạy này RAGAS cho mean thấp hơn và gate nhiều case hơn, nhưng chưa
+đủ cơ sở gọi RAGAS “tốt hơn” hay “strict hơn”: chỉ có 20 cases, một judge run,
+hai answer-quality implementations khác nhau, và judge cùng family với model
+sinh answer nên có self-preference risk. Trước khi block CI cần calibrate với
+human labels, chạy lặp để ước lượng variance và review mọi disagreement gần
+threshold. Về vận hành, RAGAS phù hợp batch diagnosis theo pipeline RAG nhưng
+cần wrapper quality gate; DeepEval có `LLMTestCase`, threshold và pytest-native
+thuận tiện hơn cho regression CI. Setup thực tế cũng khác: RAGAS 0.4.3 cần pin
+LangChain 0.3.x để tránh import conflict, còn DeepEval có adapter OpenRouter sẵn
+nhưng đã fallback sang JSON parsing khi strict structured schema của metric
+Faithfulness bị provider từ chối.
 
 ### Exercise 3.5 — Retrieval Reranking (Bonus +5)
 
@@ -215,5 +282,6 @@ retrieve; Context Precision vẫn được chấm với expected answer.
 - [x] Exercise 3.1 hoàn thành với 20 records và 10/10 source coverage.
 - [x] Exercise 3.2 có năm metrics, aggregate report và ba cases thấp nhất.
 - [x] Exercise 3.3 có rubric 1–5, edge cases và bias controls.
+- [x] Exercise 3.4 đã chạy RAGAS vs. DeepEval trên cùng 20 inputs và lưu raw results.
 - [x] `reflection.md` có ba 5 Whys analyses và regression strategy.
 - [x] `template.py` được đồng bộ thành `solution/solution.py`.
