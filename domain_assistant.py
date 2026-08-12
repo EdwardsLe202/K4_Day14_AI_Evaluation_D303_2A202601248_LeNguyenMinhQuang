@@ -243,26 +243,67 @@ class TextGenerator(Protocol):
 
 
 class OpenAIGenerator:
+    """Generate through OpenAI or the OpenRouter OpenAI-compatible endpoint."""
+
     def __init__(self, max_output_tokens: int = 300) -> None:
-        api_key = os.getenv("OPENAI_API_KEY", "").strip()
-        self.model = os.getenv("OPENAI_MODEL", "").strip()
+        openrouter_key = (
+            os.getenv("OPENROUTER_API_KEY", "").strip()
+            or os.getenv("OPEN_ROUTER_KEY", "").strip()
+        )
+        if openrouter_key:
+            self.provider = "openrouter"
+            api_key = openrouter_key
+            self.model = (
+                os.getenv("OPENROUTER_MODEL", "").strip()
+                or os.getenv("OPENAI_MODEL", "").strip()
+            )
+            base_url = os.getenv(
+                "OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"
+            ).strip()
+            default_headers = {
+                key: value
+                for key, value in {
+                    "HTTP-Referer": os.getenv("OPENROUTER_SITE_URL", "").strip(),
+                    "X-OpenRouter-Title": os.getenv(
+                        "OPENROUTER_APP_NAME", "OrbitTech Evaluation Lab"
+                    ).strip(),
+                }.items()
+                if value
+            }
+            self.client = OpenAI(
+                api_key=api_key,
+                base_url=base_url,
+                default_headers=default_headers,
+            )
+        else:
+            self.provider = "openai"
+            api_key = os.getenv("OPENAI_API_KEY", "").strip()
+            self.model = os.getenv("OPENAI_MODEL", "").strip()
+            self.client = OpenAI(api_key=api_key) if api_key else None
+
         if not api_key:
-            raise RuntimeError("OPENAI_API_KEY is missing from .env")
+            raise RuntimeError(
+                "OPENROUTER_API_KEY or OPENAI_API_KEY is missing from .env"
+            )
         if not self.model:
-            raise RuntimeError("OPENAI_MODEL is missing from .env")
-        self.client = OpenAI(api_key=api_key)
+            raise RuntimeError(
+                "OPENROUTER_MODEL or OPENAI_MODEL is missing from .env"
+            )
         self.max_output_tokens = max_output_tokens
 
     def generate(self, prompt: str) -> str:
-        response = self.client.responses.create(
+        if self.client is None:  # Defensive guard for static type checkers.
+            raise RuntimeError("Generator client is not configured")
+        response = self.client.chat.completions.create(
             model=self.model,
-            input=prompt,
+            messages=[{"role": "user", "content": prompt}],
             temperature=0,
-            max_output_tokens=self.max_output_tokens,
+            max_tokens=self.max_output_tokens,
         )
-        answer = response.output_text.strip()
+        content = response.choices[0].message.content
+        answer = content.strip() if isinstance(content, str) else ""
         if not answer:
-            raise RuntimeError("OpenAI returned an empty answer")
+            raise RuntimeError(f"{self.provider} returned an empty answer")
         return answer
 
 
@@ -399,10 +440,13 @@ def generate_actual_answers(
         )
 
     model = getattr(assistant.generator, "model", assistant.generator.__class__.__name__)
+    provider = getattr(
+        assistant.generator, "provider", assistant.generator.__class__.__name__
+    )
     total = len(questions)
     notify(
         f"Ready: {total} questions, {len(assistant.retriever.chunks)} chunks, "
-        f"model={model}, top_k={top_k}"
+        f"provider={provider}, model={model}, top_k={top_k}"
     )
 
     answers: list[dict[str, Any]] = []
@@ -458,6 +502,7 @@ def generate_actual_answers(
         "generated_at": datetime.now(UTC).isoformat(),
         "agent": {
             "name": "domain-assistant",
+            "provider": provider,
             "model": model,
             "top_k": top_k,
             "prompt_version": "1.0",

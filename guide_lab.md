@@ -552,9 +552,10 @@ sinh actual answers và làm Exercise 3.2.
 
 ---
 
-## 7. Cấu hình OpenAI API
+## 7. Cấu hình OpenRouter hoặc OpenAI API
 
-Chỉ `domain_assistant.py` cần API key.
+Chỉ `domain_assistant.py` cần API key. OpenRouter được ưu tiên khi cả hai loại
+key cùng tồn tại.
 
 macOS/Linux:
 
@@ -568,7 +569,17 @@ Windows PowerShell:
 Copy-Item .env.example .env
 ```
 
-Mở `.env` và điền:
+Mở `.env` và chọn một trong hai cấu hình sau.
+
+OpenRouter:
+
+```dotenv
+OPENROUTER_API_KEY=<OPENROUTER_KEY_CUA_BAN>
+OPENROUTER_MODEL=openai/gpt-4o-mini
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+```
+
+Hoặc OpenAI trực tiếp:
 
 ```dotenv
 OPENAI_API_KEY=<API_KEY_CUA_BAN>
@@ -802,7 +813,7 @@ environment đã được activate.
 | `ModuleNotFoundError: openai` hoặc `dotenv` | Chưa activate venv hoặc chưa cài requirements | Activate `.venv`, rồi chạy `python -m pip install -r requirements.txt` |
 | Validator liệt kê nhiều field rỗng | `golden_dataset.json` vẫn là form starter | Điền đủ 20 records; đây là lỗi mong đợi trước Exercise 3.1 |
 | `text is not a verbatim substring` | Evidence đã bị sửa wording/punctuation | Copy lại nguyên văn đoạn ngắn từ đúng `source_doc` |
-| `OPENAI_API_KEY is missing from .env` | Thiếu `.env`, key còn placeholder, hoặc chạy sai directory | Copy `.env.example` thành `.env`, điền key thật và chạy từ repo root |
+| `OPENROUTER_API_KEY or OPENAI_API_KEY is missing from .env` | Thiếu `.env`, key còn placeholder, hoặc chạy sai directory | Copy `.env.example` thành `.env`, điền một key thật và chạy từ repo root |
 | `Dataset corpus_id ... does not match assistant corpus_id` | Đã sửa nhầm `corpus_id` | Khôi phục `orbittech-customer-support-v1` |
 | `question differs between artifacts` | Golden dataset đã đổi sau lần sinh answers | Validate rồi chạy lại `python domain_assistant.py` để tạo artifact mới |
 | `Complete the required TODOs in template.py first` | Core còn `NotImplementedError` | Quay lại checkpoint test tương ứng ở Mục 4.9 |

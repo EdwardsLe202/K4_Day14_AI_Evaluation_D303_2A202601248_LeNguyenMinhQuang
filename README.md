@@ -16,16 +16,16 @@ Hướng dẫn thao tác đầy đủ nằm trong [`guide_lab.md`](guide_lab.md)
 
 ## Yêu cầu & Quick Start
 
-**Yêu cầu:** Python 3.11 trở lên. Cần **OpenAI API key** để chạy `domain_assistant.py`
-(Part 3 — sinh 20 actual answers từ RAG thật); phần code core (`template.py`, Part 1–2)
-không cần API key.
+**Yêu cầu:** Python 3.11 trở lên. Cần **OpenRouter hoặc OpenAI API key** để
+chạy `domain_assistant.py` (Part 3 — sinh 20 actual answers từ RAG thật); phần
+code core (`template.py`, Part 1–2) không cần API key.
 
 ```bash
 python --version                        # xác nhận 3.11+
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 pytest tests/ -v                         # baseline: 42 tests collected, 42 failed
-cp .env.example .env                     # rồi điền OPENAI_API_KEY (chỉ cần cho Part 3)
+cp .env.example .env                     # rồi điền OpenRouter/OpenAI key cho Part 3
 ```
 
 Chi tiết đầy đủ theo hệ điều hành, xử lý lỗi thường gặp: xem [`guide_lab.md`](guide_lab.md) Mục 2 và Mục 15.
